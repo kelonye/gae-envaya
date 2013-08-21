@@ -1,0 +1,6 @@
+
+*.pyc
+
+dist
+gae_envaya.egg-info
+test/lib
