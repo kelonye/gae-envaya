@@ -9,9 +9,9 @@ builtins:
 
 libraries:
 - name: django
-  version: "1.2"
+  version: latest
 - name: webapp2
-  version: "2.5.2"
+  version: latest
 
 handlers:
 

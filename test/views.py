@@ -1,7 +1,13 @@
 import os
+
+from google.appengine.dist import use_library
+use_library('django', '1.2')
+os.environ['DJANGO_SETTINGS_MODULE'] = '__init__'
+
 import webapp2 as webapp
-from lib import receive
 from google.appengine.ext.webapp import template
+
+from lib import receive
 
 
 class ReceiveHandler(webapp.RequestHandler):
@@ -20,3 +26,5 @@ class ReceiveHandler(webapp.RequestHandler):
 urls = [
     ('/receive/', ReceiveHandler),
 ]
+
+app = webapp.WSGIApplication(urls, debug=True)

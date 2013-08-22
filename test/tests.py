@@ -1,13 +1,22 @@
-from google.appengine._internal.django.utils import simplejson as json
-from lib.models import EnvayaInboxMessage, EnvayaOutboxMessage
-from google.appengine.api import memcache
-from google.appengine.ext import testbed
-from google.appengine.api import users
-from google.appengine.ext import ndb
-from test import app
-import unittest
-import webtest
+import os
+
+import sys
+sys.path.insert(0, '/usr/local/google_appengine')
+import dev_appserver
+dev_appserver.fix_sys_path()
+
 import logging
+import webtest
+import unittest
+
+from google.appengine.ext import ndb
+from google.appengine.api import users
+from google.appengine.ext import testbed
+from google.appengine.api import memcache
+from google.appengine._internal.django.utils import simplejson as json
+
+from lib.models import EnvayaInboxMessage, EnvayaOutboxMessage
+from views import app
 
 
 logger = logging.getLogger(__name__)
@@ -192,3 +201,5 @@ class SendstatusRequestTestCase(TestCase):
         outbox_message = outbox_message.key.get()
         assert outbox_message.send_status == 'failed'
         assert outbox_message.send_error == 'invalid receipient phone number'
+
+unittest.main()

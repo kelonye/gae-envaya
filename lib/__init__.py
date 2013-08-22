@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import sha
@@ -121,7 +122,7 @@ def validate_req(phone_number, password):
 
 def auth_req(view):
     def wrapper(self):
-        if len(sys.argv) > 1 and 'nosetests' in sys.argv[0]:
+        if len(sys.argv) > 1 and 'test' in sys.argv[0]:
             return view(self)
         data = self.request.copy()
         data_string = self.request.url
