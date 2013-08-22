@@ -14,23 +14,20 @@ logger = logging.getLogger(__name__)
 
 class Envaya(list):
 
-    def __init__(self, req):
+    def __init__(self, view):
         super(Envaya, self).__init__()
-        self.req = req
-        self.dump = {}
-        for k in req.request.arguments():
-            self.dump[k] = req.request.get(k)
-        if self.dump['action'] == ACTIONS[1]: #incoming
+        self.view = view
+        if self.view.request.get('action') == ACTIONS[1]: #incoming
             self.save_incoming_message()
-        elif self.dump['action'] == ACTIONS[2]: #outgoing
+        elif self.view.request.get('action') == ACTIONS[2]: #outgoing
             self.queue_unsent_messages()
-        elif self.dump['action'] == ACTIONS[3]: #send_status
+        elif self.view.request.get('action') == ACTIONS[3]: #send_status
             self.mark_send_status()
 
     def save_incoming_message(self):
         EnvayaInboxMessage(
-            frm=self.dump['from'],
-            message=self.dump['message']
+            frm=self.view.request.get('from'),
+            message=self.view.request.get('message')
         ).put()
 
     def queue_unsent_messages(self):
@@ -43,16 +40,16 @@ class Envaya(list):
             self.append(msg)
 
     def mark_send_status(self):
-        id = self.dump.get('id')
+        id = self.view.request.get('id')
         msg = ndb.Key(EnvayaOutboxMessage, int(id)).get()
-        msg.send_status = self.dump['status']
-        msg.send_error = self.dump.get('error')
+        msg.send_status = self.view.request.get('status')
+        msg.send_error = self.view.request.get('error')
         msg.put()
 
     def queue(self, message):
-        frm = self.dump['phone_number']
-        if self.dump['action'] == ACTIONS[1]:
-            frm = self.dump['from']
+        frm = self.view.request.get('phone_number')
+        if self.view.request.get('action') == ACTIONS[1]:
+            frm = self.view.request.get('from')
         message.setdefault('event', 'send')
         message.setdefault('to', frm)
         outbox_message = EnvayaOutboxMessage(
@@ -78,8 +75,8 @@ class Envaya(list):
             'events': events
         }
         json_content = json.dumps(content)
-        self.req.response.headers['Content-Type'] = 'application/json'
-        self.req.response.out.write(json_content)
+        self.view.response.headers['Content-Type'] = 'application/json'
+        self.view.response.out.write(json_content)
         return
 
 
