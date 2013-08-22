@@ -80,10 +80,10 @@ class IncomingRequestTestCase(TestCase):
 
     def test_response(self):
         data = {
-              'from': '254700111999'
-            , 'message_type': ''
-            , 'message': ''
-            , 'timestamp': ''
+            'from': '254700111999',
+            'message_type': '',
+            'message': 'hello',
+            'timestamp': ''
         }
         res = self.POST(self.uri, data)
         self.assertEqual(res.status_int, 200)
@@ -92,7 +92,7 @@ class IncomingRequestTestCase(TestCase):
         msgs = EnvayaInboxMessage.query()
         assert msgs.count(3) == 1
         msg = msgs.get()
-        assert msg.action == 'incoming'
+        assert msg.message == 'hello'
         assert msg.frm == '254700111999'
         
         # res data
@@ -121,30 +121,30 @@ class OutgoingRequestTestCase(TestCase):
         self.POST = POST
 
     def test_response(self):
-        send_status = EnvayaInboxMessage(
-            dump=''
-        )
-        send_status.put()
         EnvayaOutboxMessage(
-              to='254700111888'
-            , message='outgoing'
-            , send_status=send_status.key
+            to='254700111222',
+            message='outgoing',
+            send_status='queued'
         ).put()
         EnvayaOutboxMessage(
-              to='254700111999'
-            , message='outgoing'
+            to='254700111333',
+            message='outgoing',
+            send_status='failed'
+        ).put()
+        EnvayaOutboxMessage(
+            to='254700111444',
+            message='outgoing',
+            send_status='cancelled'
+        ).put()
+        EnvayaOutboxMessage(
+            to='254700111555',
+            message='outgoing',
+            send_status='sent'
         ).put()
         data = {
         }
         res = self.POST(self.uri, data)
         self.assertEqual(res.status_int, 200)
-        #
-        # assert req was logged
-        send_status.key.delete()
-        msgs = EnvayaInboxMessage.query()
-        assert msgs.count() == 1
-        msg = msgs.get()
-        assert msg.action == 'outgoing'
         #
         # res data
         data = res.json
@@ -155,7 +155,7 @@ class OutgoingRequestTestCase(TestCase):
         # assert queued up only 1 unsent msg
         assert len(event['messages']) == 1
         msg = event['messages'][0]
-        assert msg['to'] == '254700111999'
+        assert msg['to'] == '254700111222'
         assert msg['message'] == 'outgoing'
 
 
@@ -176,24 +176,19 @@ class SendstatusRequestTestCase(TestCase):
         self.assertEqual(res.status_int, 400)
 
     def test_response(self):
-        outboxmsg = EnvayaOutboxMessage(
-              to='254700111999'
-            , message='outgoing'
+        outbox_message = EnvayaOutboxMessage(
+            to='254700111999',
+            message='outgoing'
         )
-        outboxmsg.put()
+        outbox_message.put()
         data = {
-              'id': str(outboxmsg.key.id())
-            , 'status': 'failed'
-            , 'error': 'invalid receipient phone number'
+            'id': str(outbox_message.key.id()),
+            'status': 'failed',
+            'error': 'invalid receipient phone number'
         }
         res = self.POST(self.uri, data)
         self.assertEqual(res.status_int, 200)
         #
-        # assert req was logged
-        msgs = EnvayaInboxMessage.query()
-        assert msgs.count() == 1
-        msg = msgs.get()
-        assert msg.action == 'send_status'
-        #
-        outboxmsg = outboxmsg.key.get()
-        assert outboxmsg.send_status == msg.key
+        outbox_message = outbox_message.key.get()
+        assert outbox_message.send_status == 'failed'
+        assert outbox_message.send_error == 'invalid receipient phone number'

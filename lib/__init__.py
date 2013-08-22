@@ -5,7 +5,7 @@ import hashlib
 import logging
 import webapp2 as webapp
 from google.appengine.ext import ndb
-from models import EnvayaInboxMessage, EnvayaOutboxMessage
+from models import EnvayaInboxMessage, EnvayaOutboxMessage, ACTIONS
 from google.appengine._internal.django.utils import simplejson as json
 
 
@@ -17,24 +17,25 @@ class Envaya(list):
     def __init__(self, req):
         super(Envaya, self).__init__()
         self.req = req
-        dump = {}
+        self.dump = {}
         for k in req.request.arguments():
-            v = req.request.get(k)
-            dump[k] = v
-        self.msg = EnvayaInboxMessage(
-            dump=json.dumps(dump)
-        )
-        self.msg.put()
-        if self.msg.action == self.msg.ACTIONS[1]: #incoming
-            pass
-        elif self.msg.action == self.msg.ACTIONS[2]: #outgoing
+            self.dump[k] = req.request.get(k)
+        if self.dump['action'] == ACTIONS[1]: #incoming
+            self.save_incoming_message()
+        elif self.dump['action'] == ACTIONS[2]: #outgoing
             self.queue_unsent_messages()
-        elif self.msg.action == self.msg.ACTIONS[3]: #send_status
+        elif self.dump['action'] == ACTIONS[3]: #send_status
             self.mark_send_status()
+
+    def save_incoming_message(self):
+        EnvayaInboxMessage(
+            frm=self.dump['from'],
+            message=self.dump['message']
+        ).put()
 
     def queue_unsent_messages(self):
         unsent_messages = EnvayaOutboxMessage.gql(
-            'WHERE send_status=:1', None
+            'WHERE send_status=:1', 'queued'
         )
         for msg in unsent_messages.fetch(1000):
             msg = msg.toDICT
@@ -42,22 +43,24 @@ class Envaya(list):
             self.append(msg)
 
     def mark_send_status(self):
-        msg = self.msg.outbox_message
-        msg.send_status = self.msg.key
+        id = self.dump.get('id')
+        msg = ndb.Key(EnvayaOutboxMessage, int(id)).get()
+        msg.send_status = self.dump['status']
+        msg.send_error = self.dump.get('error')
         msg.put()
 
     def queue(self, message):
-        frm = self.msg.phone_number
-        if self.msg.action == self.msg.ACTIONS[1]:
-            frm = self.msg.frm
+        frm = self.dump['phone_number']
+        if self.dump['action'] == ACTIONS[1]:
+            frm = self.dump['from']
         message.setdefault('event', 'send')
         message.setdefault('to', frm)
-        outboxMsg = EnvayaOutboxMessage(
-              to=message['to']
-            , message=message['message']
+        outbox_message = EnvayaOutboxMessage(
+            to=message['to'],
+            message=message['message']
         )
-        outboxMsg.put()
-        message['id'] = str(outboxMsg.key.id())
+        outbox_message.put()
+        message['id'] = str(outbox_message.key.id())
         self.append(message)
 
     def send(self):
@@ -103,7 +106,7 @@ def validate_req(phone_number, password):
                     self.response.clear()
                     self.response.set_status(400, e)
                     return
-            if self.request.get('action') not in EnvayaInboxMessage.ACTIONS.values():
+            if self.request.get('action') not in ACTIONS.values():
                 e = 'invalid request action'
                 self.response.clear()
                 self.response.set_status(400, e)
@@ -152,7 +155,7 @@ def handle_test_req(view):
 
 def validate_incoming_req(view):
     def wrapper(self):
-        if self.request.get('action') == EnvayaInboxMessage.ACTIONS[1]:
+        if self.request.get('action') == ACTIONS[1]:
             for attr in [
                   'from'
                 , 'message_type'
@@ -171,7 +174,7 @@ def validate_incoming_req(view):
 
 def validate_outgoing_req(view):
     def wrapper(self):
-        if self.request.get('action') == EnvayaInboxMessage.ACTIONS[2]:
+        if self.request.get('action') == ACTIONS[2]:
             pass
         return view(self)
     return wrapper
@@ -179,11 +182,11 @@ def validate_outgoing_req(view):
 
 def validate_send_status_req(view):
     def wrapper(self):
-        if self.request.get('action') == EnvayaInboxMessage.ACTIONS[3]:
+        if self.request.get('action') == ACTIONS[3]:
             for attr in [
-                  'id'
-                , 'status'
-                , 'error'
+                'id',
+                'status',
+                'error'
             ]:
                 try:
                     validate(self, attr)
