@@ -12,7 +12,6 @@ publish:
 	@$(MAKE) clean
 
 clean:
-	@$(MAKE) clean -sC test/
 	@rm -rf build dist gae_envaya.egg-info $(shell find -name '*.pyc')
 
 .PHONY: clean publish deps example test
